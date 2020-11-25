@@ -55,10 +55,37 @@ body {
 	-webkit-text-size-adjust: none;
 }
 
+.inline-block {
+    display: inline-block;
+    max-width: 18%;
+    margin: 0 0%;
+}
+
 mark {
 	background-color: transparent;
 	color: inherit;
 }
+
+dl {
+    display: flex;
+    flex-flow:row wrap;
+    margin-left: 120px;
+  }
+dt {
+    flex-basis: 20%;
+    padding: 2px 4px;
+    text-align: right;
+    margin-right: 120px;
+  }
+.dl-horizontal dd {
+    margin-left: -180px;
+  }
+dd {
+    flex-basis:60%;
+    flex-grow: 0;
+    padding: 2px 4px;
+    text-align: left;
+  }
 
 input::-moz-focus-inner {
 	border: 0;

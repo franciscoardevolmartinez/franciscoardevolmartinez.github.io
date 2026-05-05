@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Brown Dwarf Spectrum Explorer</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.23.2/dist/ort.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="topbar">
+        <div>
+          <h1>Brown Dwarf Spectrum Explorer</h1>
+          <p>Move the atmospheric parameters to run the ONNX model in your browser.</p>
+        </div>
+        <div class="status-panel">
+          <span id="status-dot" class="status-dot"></span>
+          <span id="status-text">Loading model...</span>
+        </div>
+      </section>
+
+      <section class="workspace">
+        <aside class="controls" aria-label="Atmospheric parameter controls">
+          <div class="panel-heading">
+            <h2>Parameters</h2>
+            <button id="reset-button" type="button">Reset</button>
+          </div>
+          <div id="slider-list" class="slider-list"></div>
+          <div class="display-options">
+            <label class="toggle-row">
+              <input id="linear-flux-toggle" type="checkbox" />
+              <span>Plot 10^y</span>
+            </label>
+          </div>
+        </aside>
+
+        <section class="chart-area" aria-label="Predicted spectrum">
+          <div id="spectrum-plot"></div>
+        </section>
+      </section>
+    </main>
+
+    <script type="module" src="./app.js?v=1"></script>
+  </body>
+</html>

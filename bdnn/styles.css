@@ -60,6 +60,13 @@ input {
   color: var(--muted);
 }
 
+.topbar .credit {
+  margin-top: 4px;
+  color: var(--accent-strong);
+  font-size: 0.92rem;
+  font-weight: 650;
+}
+
 .status-panel {
   display: inline-flex;
   align-items: center;

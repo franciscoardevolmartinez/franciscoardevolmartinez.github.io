@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Brown Dwarf Spectrum Predictor</title>
-<meta name="bdnn-version" content="daanyal-frontend-2026-05-19">
+<meta name="bdnn-version" content="daanyal-a3e50a9-2026-05-19">
 <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist/plotly.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;500;700&display=swap" rel="stylesheet">
@@ -27,7 +27,7 @@
     --sans: 'Syne', sans-serif;
   }
 
-  body {
+  html, body {
     background: var(--bg);
     color: var(--text);
     font-family: var(--sans);
@@ -35,6 +35,7 @@
     overflow-x: hidden;
   }
 
+  /* Starfield */
   body::before {
     content: '';
     position: fixed;
@@ -54,35 +55,28 @@
     z-index: 0;
   }
 
-  .layout {
-    display: grid;
-    grid-template-columns: 320px 1fr;
-    grid-template-rows: auto 1fr;
-    min-height: 100vh;
-    position: relative;
-    z-index: 1;
-  }
-
+  /* ── HEADER ── */
   header {
-    grid-column: 1 / -1;
-    padding: 1.2rem 2rem;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    padding: 0.9rem 1.25rem;
     border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
-    gap: 1rem;
-    background: rgba(5,8,16,0.85);
+    gap: 0.75rem;
+    background: rgba(5,8,16,0.92);
     backdrop-filter: blur(12px);
   }
 
   .logo-mark {
-    width: 34px; height: 34px;
+    width: 30px; height: 30px;
+    flex-shrink: 0;
     border-radius: 50%;
     background: radial-gradient(circle at 35% 35%, #7eb8ff, #1a3a7a);
     border: 1px solid var(--border2);
-    flex-shrink: 0;
     position: relative;
   }
-
   .logo-mark::after {
     content: '';
     position: absolute;
@@ -93,15 +87,13 @@
 
   header h1 {
     font-family: var(--sans);
-    font-size: 1rem;
+    font-size: clamp(0.78rem, 2.5vw, 1rem);
     font-weight: 700;
-    letter-spacing: 0.05em;
-    color: var(--text);
+    letter-spacing: 0.04em;
   }
-
   header p {
     font-family: var(--mono);
-    font-size: 0.65rem;
+    font-size: 0.6rem;
     color: var(--text3);
     letter-spacing: 0.1em;
     text-transform: uppercase;
@@ -112,30 +104,89 @@
     margin-left: auto;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     font-family: var(--mono);
-    font-size: 0.65rem;
+    font-size: 0.6rem;
     color: var(--text3);
+    white-space: nowrap;
   }
-
   .dot {
     width: 6px; height: 6px;
     border-radius: 50%;
     background: #3a4a6a;
     flex-shrink: 0;
   }
-  .dot.ready  { background: #4fff9d; box-shadow: 0 0 6px #4fff9d; }
+  .dot.ready   { background: #4fff9d; box-shadow: 0 0 6px #4fff9d; }
   .dot.loading { background: #ff9d4f; animation: pulse 1s infinite; }
-  .dot.error  { background: #ff5050; }
+  .dot.error   { background: #ff5050; }
 
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  @keyframes spin  { to { transform: rotate(360deg); } }
 
+  /* ── PAGE WRAPPER ── */
+  .page {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  /* ── DESKTOP: side-by-side ── */
+  @media (min-width: 720px) {
+    .page {
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      min-height: calc(100vh - 57px);
+    }
+  }
+
+  /* ── SIDEBAR ── */
   aside {
-    border-right: 1px solid var(--border);
-    padding: 1.25rem;
+    border-bottom: 1px solid var(--border);
+    padding: 1.1rem 1.1rem 1.4rem;
     background: rgba(12,16,32,0.65);
     backdrop-filter: blur(8px);
-    overflow-y: auto;
+  }
+
+  @media (min-width: 720px) {
+    aside {
+      border-bottom: none;
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      /* stick to viewport height */
+      position: sticky;
+      top: 57px;
+      max-height: calc(100vh - 57px);
+    }
+  }
+
+  /* collapsible on mobile */
+  .params-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    user-select: none;
+    margin-bottom: 0;
+  }
+  .params-toggle .chevron {
+    font-size: 0.7rem;
+    color: var(--text3);
+    transition: transform 0.25s;
+  }
+  .params-toggle.open .chevron { transform: rotate(180deg); }
+
+  .params-body {
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height 0.35s ease;
+  }
+  .params-body.open { max-height: 1000px; }
+
+  @media (min-width: 720px) {
+    .params-toggle .chevron { display: none; }
+    .params-body { max-height: none !important; overflow: visible; }
   }
 
   .section-label {
@@ -144,9 +195,15 @@
     letter-spacing: 0.15em;
     text-transform: uppercase;
     color: var(--text3);
-    margin-bottom: 0.9rem;
     padding-bottom: 0.5rem;
     border-bottom: 1px solid var(--border);
+  }
+
+  .params-toggle .section-label { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
+  .params-body .inner { padding-top: 1rem; }
+
+  @media (min-width: 720px) {
+    .section-label { margin-bottom: 0.9rem; border-bottom: 1px solid var(--border); }
   }
 
   .param-row { margin-bottom: 1.1rem; }
@@ -155,15 +212,13 @@
     display: flex;
     justify-content: space-between;
     align-items: baseline;
-    margin-bottom: 0.35rem;
+    margin-bottom: 0.4rem;
   }
-
   .param-name {
     font-size: 0.78rem;
     font-weight: 500;
     color: var(--text2);
   }
-
   .param-value {
     font-family: var(--mono);
     font-size: 0.72rem;
@@ -173,63 +228,84 @@
     border-radius: 4px;
     border: 1px solid rgba(79,143,255,0.2);
   }
-
   .param-unit {
     font-family: var(--mono);
     font-size: 0.58rem;
     color: var(--text3);
-    margin-top: 3px;
+    margin-top: 4px;
+  }
+
+  /* Slider — tall touch target on mobile */
+  .slider-wrap {
+    position: relative;
+    height: 28px;
+    display: flex;
+    align-items: center;
   }
 
   input[type=range] {
     width: 100%;
-    height: 3px;
+    height: 4px;
     -webkit-appearance: none;
     appearance: none;
     background: var(--surface2);
     border-radius: 2px;
     outline: none;
     cursor: pointer;
+    /* expand tap area */
+    padding: 10px 0;
+    box-sizing: content-box;
+    margin: -10px 0;
   }
-
   input[type=range]::-webkit-slider-thumb {
     -webkit-appearance: none;
-    width: 14px; height: 14px;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid var(--bg);
+    cursor: pointer;
+    transition: transform 0.1s;
+  }
+  input[type=range]:active::-webkit-slider-thumb { transform: scale(1.25); }
+  input[type=range]::-moz-range-thumb {
+    width: 18px; height: 18px;
     border-radius: 50%;
     background: var(--accent);
     border: 2px solid var(--bg);
     cursor: pointer;
   }
-
   input[type=range]::-webkit-slider-runnable-track {
     background: linear-gradient(to right, var(--accent) var(--pct,0%), var(--surface2) var(--pct,0%));
-    height: 3px;
+    height: 4px;
     border-radius: 2px;
   }
 
+  /* ── MAIN ── */
   main {
-    padding: 1.25rem;
+    padding: 1rem;
     display: flex;
     flex-direction: column;
-    gap: 0.9rem;
-    overflow: hidden;
+    gap: 0.8rem;
   }
 
+  /* Stats */
   .stats-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 0.65rem;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.6rem;
+  }
+  @media (min-width: 480px) {
+    .stats-grid { grid-template-columns: repeat(4, 1fr); }
   }
 
   .stat-card {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 10px;
-    padding: 0.75rem 0.9rem;
+    padding: 0.65rem 0.8rem;
     position: relative;
     overflow: hidden;
   }
-
   .stat-card::before {
     content: '';
     position: absolute;
@@ -238,46 +314,44 @@
     background: linear-gradient(to right, var(--accent), transparent);
     opacity: 0.4;
   }
-
   .stat-label {
     font-family: var(--mono);
-    font-size: 0.58rem;
+    font-size: 0.55rem;
     color: var(--text3);
-    letter-spacing: 0.1em;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
-    margin-bottom: 0.35rem;
+    margin-bottom: 0.3rem;
   }
-
   .stat-value {
     font-family: var(--mono);
-    font-size: 0.95rem;
+    font-size: clamp(0.78rem, 2vw, 0.95rem);
     color: var(--accent2);
     font-weight: 700;
+    word-break: break-all;
   }
-
   .stat-sub {
-    font-size: 0.6rem;
+    font-size: 0.58rem;
     color: var(--text3);
     margin-top: 2px;
   }
 
+  /* Chart */
   .chart-card {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 12px;
-    padding: 1rem;
+    padding: 0.9rem;
     flex: 1;
-    min-height: 0;
     position: relative;
   }
-
   .chart-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     margin-bottom: 0.5rem;
+    flex-wrap: wrap;
+    gap: 0.4rem;
   }
-
   .chart-title {
     font-family: var(--mono);
     font-size: 0.6rem;
@@ -285,7 +359,6 @@
     letter-spacing: 0.12em;
     text-transform: uppercase;
   }
-
   .csv-btn {
     font-family: var(--mono);
     font-size: 0.62rem;
@@ -293,17 +366,23 @@
     background: var(--accent-glow);
     border: 1px solid rgba(79,143,255,0.25);
     border-radius: 5px;
-    padding: 3px 12px;
+    padding: 4px 14px;
     cursor: pointer;
     letter-spacing: 0.06em;
     transition: background 0.15s;
+    /* tap-friendly */
+    min-height: 30px;
   }
-
   .csv-btn:hover:not(:disabled) { background: rgba(79,143,255,0.25); }
   .csv-btn:disabled { opacity: 0.35; cursor: default; }
 
-  #plot { width: 100%; height: 360px; }
+  #plot {
+    width: 100%;
+    /* responsive height */
+    height: clamp(220px, 45vw, 380px);
+  }
 
+  /* Loading overlay */
   .loading-overlay {
     position: absolute;
     inset: 0;
@@ -316,24 +395,23 @@
     gap: 1rem;
     z-index: 10;
   }
-
   .spinner {
-    width: 30px; height: 30px;
+    width: 28px; height: 28px;
     border: 2px solid var(--border2);
     border-top-color: var(--accent);
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
   }
-
-  @keyframes spin { to { transform: rotate(360deg); } }
-
   .loading-text {
     font-family: var(--mono);
     font-size: 0.65rem;
     color: var(--text3);
     letter-spacing: 0.1em;
+    text-align: center;
+    padding: 0 1rem;
   }
 
+  /* Error */
   .error-msg {
     background: rgba(255,80,80,0.08);
     border: 1px solid rgba(255,80,80,0.25);
@@ -348,86 +426,109 @@
 </style>
 </head>
 <body>
-<div class="layout">
 
-  <header>
-    <div class="logo-mark"></div>
-    <div>
-      <h1>Brown Dwarf Spectrum Predictor</h1>
-      <p>BDNYC &mdash; Tool by Daanyal Haque</p>
-    </div>
-    <div class="status-dot">
-      <div class="dot loading" id="status-dot"></div>
-      <span id="status-text">Loading model...</span>
-    </div>
-  </header>
+<header>
+  <div class="logo-mark"></div>
+  <div>
+    <h1>Brown Dwarf Spectrum Predictor</h1>
+    <p>BDNYC &mdash; Tool by Daanyal Haque</p>
+  </div>
+  <div class="status-dot">
+    <div class="dot loading" id="status-dot"></div>
+    <span id="status-text">Loading...</span>
+  </div>
+</header>
+
+<div class="page">
 
   <aside>
-    <div class="section-label">Parameters</div>
-
-    <div class="param-row">
-      <div class="param-header">
-        <span class="param-name">Temperature</span>
-        <span class="param-value" id="val-temp">630 K</span>
-      </div>
-      <input type="range" id="sl-temp" min="200" max="2000" step="10" value="630">
-      <div class="param-unit">200 – 2000 K</div>
+    <!-- On mobile: tap to expand/collapse -->
+    <div class="params-toggle" id="params-toggle" onclick="toggleParams()">
+      <div class="section-label">Parameters</div>
+      <span class="chevron">▼</span>
     </div>
+    <div class="params-body" id="params-body">
+      <div class="inner">
 
-    <div class="param-row">
-      <div class="param-header">
-        <span class="param-name">C/O Ratio</span>
-        <span class="param-value" id="val-co">0.50</span>
-      </div>
-      <input type="range" id="sl-co" min="0" max="1" step="0.01" value="0.5">
-      <div class="param-unit">0.00 – 1.00</div>
-    </div>
+        <div class="param-row">
+          <div class="param-header">
+            <span class="param-name">Temperature</span>
+            <span class="param-value" id="val-temp">630 K</span>
+          </div>
+          <div class="slider-wrap">
+            <input type="range" id="sl-temp" min="200" max="2000" step="10" value="630">
+          </div>
+          <div class="param-unit">200 – 2000 K</div>
+        </div>
 
-    <div class="param-row">
-      <div class="param-header">
-        <span class="param-name">N/O Ratio</span>
-        <span class="param-value" id="val-no">0.0300</span>
-      </div>
-      <input type="range" id="sl-no" min="0.001" max="1.0" step="0.001" value="0.03">
-      <div class="param-unit">0.001 – 1.000</div>
-    </div>
+        <div class="param-row">
+          <div class="param-header">
+            <span class="param-name">C/O Ratio</span>
+            <span class="param-value" id="val-co">0.50</span>
+          </div>
+          <div class="slider-wrap">
+            <input type="range" id="sl-co" min="0" max="1" step="0.01" value="0.5">
+          </div>
+          <div class="param-unit">0.00 – 1.00</div>
+        </div>
 
-    <div class="param-row">
-      <div class="param-header">
-        <span class="param-name">S/O Ratio</span>
-        <span class="param-value" id="val-so">0.0300</span>
-      </div>
-      <input type="range" id="sl-so" min="0.001" max="1.0" step="0.001" value="0.03">
-      <div class="param-unit">0.001 – 1.000</div>
-    </div>
+        <div class="param-row">
+          <div class="param-header">
+            <span class="param-name">N/O Ratio</span>
+            <span class="param-value" id="val-no">0.0300</span>
+          </div>
+          <div class="slider-wrap">
+            <input type="range" id="sl-no" min="0.001" max="1.0" step="0.001" value="0.03">
+          </div>
+          <div class="param-unit">0.001 – 1.000</div>
+        </div>
 
-    <div class="param-row">
-      <div class="param-header">
-        <span class="param-name">Metallicity [Fe/H]</span>
-        <span class="param-value" id="val-metal">0.0</span>
-      </div>
-      <input type="range" id="sl-metal" min="-3" max="3" step="0.1" value="0">
-      <div class="param-unit">−3.0 – +3.0</div>
-    </div>
+        <div class="param-row">
+          <div class="param-header">
+            <span class="param-name">S/O Ratio</span>
+            <span class="param-value" id="val-so">0.0300</span>
+          </div>
+          <div class="slider-wrap">
+            <input type="range" id="sl-so" min="0.001" max="1.0" step="0.001" value="0.03">
+          </div>
+          <div class="param-unit">0.001 – 1.000</div>
+        </div>
 
-    <div class="param-row">
-      <div class="param-header">
-        <span class="param-name">K<sub>zz</sub> (mixing)</span>
-        <span class="param-value" id="val-kzz">5.0</span>
-      </div>
-      <input type="range" id="sl-kzz" min="0" max="10" step="0.1" value="5">
-      <div class="param-unit">0.0 – 10.0</div>
-    </div>
+        <div class="param-row">
+          <div class="param-header">
+            <span class="param-name">Metallicity [Fe/H]</span>
+            <span class="param-value" id="val-metal">0.0</span>
+          </div>
+          <div class="slider-wrap">
+            <input type="range" id="sl-metal" min="-3" max="3" step="0.1" value="0">
+          </div>
+          <div class="param-unit">−3.0 – +3.0</div>
+        </div>
 
-    <div class="param-row">
-      <div class="param-header">
-        <span class="param-name">Gravity (log g)</span>
-        <span class="param-value" id="val-grav">4.50</span>
-      </div>
-      <input type="range" id="sl-grav" min="3" max="6" step="0.1" value="4.5">
-      <div class="param-unit">3.0 – 6.0</div>
-    </div>
+        <div class="param-row">
+          <div class="param-header">
+            <span class="param-name">K<sub>zz</sub> (mixing)</span>
+            <span class="param-value" id="val-kzz">5.0</span>
+          </div>
+          <div class="slider-wrap">
+            <input type="range" id="sl-kzz" min="0" max="10" step="0.1" value="5">
+          </div>
+          <div class="param-unit">0.0 – 10.0</div>
+        </div>
 
+        <div class="param-row" style="margin-bottom:0">
+          <div class="param-header">
+            <span class="param-name">Gravity (log g)</span>
+            <span class="param-value" id="val-grav">4.50</span>
+          </div>
+          <div class="slider-wrap">
+            <input type="range" id="sl-grav" min="3" max="6" step="0.1" value="4.5">
+          </div>
+          <div class="param-unit">3.0 – 6.0</div>
+        </div>
+
+      </div><!-- /inner -->
+    </div><!-- /params-body -->
   </aside>
 
   <main>
@@ -469,8 +570,29 @@
     </div>
   </main>
 
-</div>
+</div><!-- /page -->
+
 <script>
+/* ── Collapsible params (mobile only) ── */
+function toggleParams() {
+  if (window.innerWidth >= 720) return; // desktop always open
+  const toggle = document.getElementById('params-toggle');
+  const body   = document.getElementById('params-body');
+  const open   = body.classList.toggle('open');
+  toggle.classList.toggle('open', open);
+}
+
+// On desktop, always show params body
+function ensureParamsOpen() {
+  if (window.innerWidth >= 720) {
+    document.getElementById('params-body').classList.add('open');
+    document.getElementById('params-toggle').classList.add('open');
+  }
+}
+ensureParamsOpen();
+window.addEventListener('resize', ensureParamsOpen);
+
+/* ── Model / data ── */
 const FILES = {
   model:   'pca_model.onnx',
   xScaler: 'x_scaler.json',
@@ -494,7 +616,8 @@ const sliders = {
 };
 
 function updateSliderTrack(el) {
-  const pct = ((parseFloat(el.value) - parseFloat(el.min)) / (parseFloat(el.max) - parseFloat(el.min)) * 100).toFixed(1) + '%';
+  const pct = ((parseFloat(el.value) - parseFloat(el.min)) /
+               (parseFloat(el.max) - parseFloat(el.min)) * 100).toFixed(1) + '%';
   el.style.setProperty('--pct', pct);
 }
 
@@ -571,19 +694,19 @@ async function predict() {
   }], {
     paper_bgcolor: 'transparent',
     plot_bgcolor:  'transparent',
-    margin: { t: 10, r: 20, b: 50, l: 65 },
+    margin: { t: 10, r: 10, b: 50, l: 55 },
     xaxis: {
-      title: { text: 'Wavelength (μm)', font: { color: '#4a5a88', size: 11, family: 'Space Mono' } },
+      title: { text: 'Wavelength (μm)', font: { color: '#4a5a88', size: 10, family: 'Space Mono' } },
       color: '#4a5a88', gridcolor: 'rgba(100,140,255,0.07)',
       linecolor: 'rgba(100,140,255,0.15)',
-      tickfont: { color: '#4a5a88', size: 10, family: 'Space Mono' },
+      tickfont: { color: '#4a5a88', size: 9, family: 'Space Mono' },
       zerolinecolor: 'rgba(100,140,255,0.08)',
     },
     yaxis: {
-      title: { text: 'Flux', font: { color: '#4a5a88', size: 11, family: 'Space Mono' } },
+      title: { text: 'Flux', font: { color: '#4a5a88', size: 10, family: 'Space Mono' } },
       color: '#4a5a88', gridcolor: 'rgba(100,140,255,0.07)',
       linecolor: 'rgba(100,140,255,0.15)',
-      tickfont: { color: '#4a5a88', size: 10, family: 'Space Mono' },
+      tickfont: { color: '#4a5a88', size: 9, family: 'Space Mono' },
       zerolinecolor: 'rgba(100,140,255,0.08)',
     },
     showlegend: false,
@@ -640,7 +763,9 @@ async function init() {
   } catch(e) {
     document.getElementById('loading-overlay').style.display = 'none';
     const err = document.getElementById('error-msg');
-    err.textContent = 'Failed to load model: ' + e.message + '. Make sure pca_model.onnx, x_scaler.json, y_scaler.json, pca.json, and wavelength.json are all in the same folder as this HTML file, and you are running via python -m http.server 8000.';
+    err.textContent = 'Failed to load model: ' + e.message +
+      '. Make sure pca_model.onnx, x_scaler.json, y_scaler.json, pca.json, and wavelength.json ' +
+      'are all in the same folder as this HTML file, and run via: python -m http.server 8000';
     err.style.display = 'block';
     document.getElementById('status-text').textContent = 'Error';
     document.getElementById('status-dot').className = 'dot error';
@@ -650,7 +775,7 @@ async function init() {
 
 Plotly.newPlot('plot', [], {
   paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
-  margin: { t: 10, r: 20, b: 50, l: 65 },
+  margin: { t: 10, r: 10, b: 50, l: 55 },
   xaxis: { color: '#4a5a88', gridcolor: 'rgba(100,140,255,0.07)' },
   yaxis: { color: '#4a5a88', gridcolor: 'rgba(100,140,255,0.07)' },
 }, { responsive: true, displayModeBar: false });

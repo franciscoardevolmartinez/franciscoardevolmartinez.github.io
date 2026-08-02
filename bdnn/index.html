@@ -533,7 +533,7 @@
           <div class="param-unit">0.0 – 10.0</div>
         </div>
 
-        <div class="param-row" style="margin-bottom:0">
+        <div class="param-row">
           <div class="param-header">
             <span class="param-name">Gravity (log g)</span>
             <span class="param-value" id="val-grav">4.50</span>
@@ -542,6 +542,17 @@
             <input type="range" id="sl-grav" min="3" max="6" step="0.1" value="4.5">
           </div>
           <div class="param-unit">3.0 – 6.0</div>
+        </div>
+
+        <div class="param-row" style="margin-bottom:0">
+          <div class="param-header">
+            <span class="param-name">R²/d² Scale</span>
+            <span class="param-value" id="val-scale">1.00</span>
+          </div>
+          <div class="slider-wrap">
+            <input type="range" id="sl-scale" min="-6" max="6" step="0.05" value="0">
+          </div>
+          <div class="param-unit">multiplies model flux by 10^x</div>
         </div>
 
       </div><!-- /inner -->
@@ -579,11 +590,11 @@
         <span class="chart-title">Predicted Spectrum</span>
         <div class="chart-actions">
           <label class="upload-btn" for="spectrum-file">Upload Data</label>
-          <input class="file-input" type="file" id="spectrum-file" accept=".csv,.txt,.dat,.tsv,text/csv,text/plain">
+          <input class="file-input" type="file" id="spectrum-file" accept=".csv,.txt,.dat,.tsv,text/csv,text/plain" multiple>
           <button class="upload-btn clear" id="clear-spectrum-btn" onclick="clearUploadedSpectrum()" style="display:none">Clear Data</button>
           <button class="csv-btn" id="csv-btn" onclick="downloadCSV()" disabled>Download CSV</button>
         </div>
-        <div class="upload-status" id="upload-status">Upload a CSV/TXT spectrum with columns: wavelength, flux, optional flux_error. Extra columns are ignored. A one-column flux file will use the model wavelength grid.</div>
+        <div class="upload-status" id="upload-status">Upload one or more CSV/TXT spectra with columns: wavelength, flux, optional flux_error. Extra columns are ignored. One-column flux files use the model wavelength grid.</div>
       </div>
       <div id="plot"></div>
       <div class="loading-overlay" id="loading-overlay">
@@ -625,7 +636,7 @@ const FILES = {
 };
 
 let session = null, xScaler = null, yScaler = null, pcaData = null, wavelengths = null;
-let lastFlux = null, lastWl = null, uploadedSpectrum = null;
+let lastFlux = null, lastModelFlux = null, lastWl = null, uploadedSpectra = [];
 let debounceTimer = null;
 
 const sliders = {
@@ -637,6 +648,8 @@ const sliders = {
   kzz:   document.getElementById('sl-kzz'),
   grav:  document.getElementById('sl-grav'),
 };
+
+const scaleSlider = document.getElementById('sl-scale');
 
 function updateSliderTrack(el) {
   const pct = ((parseFloat(el.value) - parseFloat(el.min)) /
@@ -663,6 +676,7 @@ function updateLabels() {
   const metal = parseFloat(sliders.metal.value);
   const kzz   = parseFloat(sliders.kzz.value);
   const grav  = parseFloat(sliders.grav.value);
+  const scale = getFluxScale();
 
   document.getElementById('val-temp').textContent  = T + ' K';
   document.getElementById('val-co').textContent    = co.toFixed(2);
@@ -671,6 +685,7 @@ function updateLabels() {
   document.getElementById('val-metal').textContent = metal.toFixed(1);
   document.getElementById('val-kzz').textContent   = kzz.toFixed(1);
   document.getElementById('val-grav').textContent  = grav.toFixed(2);
+  document.getElementById('val-scale').textContent = scale.toExponential(2);
 
   document.getElementById('s-temp').textContent     = T + ' K';
   document.getElementById('s-temp-log').textContent = Math.log10(T).toFixed(2);
@@ -679,7 +694,11 @@ function updateLabels() {
   document.getElementById('s-grav').textContent     = grav.toFixed(2);
 
   Object.values(sliders).forEach(updateSliderTrack);
+  updateSliderTrack(scaleSlider);
 }
+
+function getFluxScale() { return Math.pow(10, parseFloat(scaleSlider.value)); }
+function applyFluxScale(flux) { return flux.map(v => v * getFluxScale()); }
 
 function stdScale(v, mean, std)   { return (v - mean) / std; }
 function stdUnscale(v, mean, std) { return v * std + mean; }
@@ -707,10 +726,11 @@ async function predict() {
   const logFlux = recon.map((v, i) => stdUnscale(v, yScaler.mean[i], yScaler.std[i]));
   const flux    = logFlux.map(v => Math.pow(10, v));
   const wl      = wavelengths || Array.from({length: flux.length}, (_, i) => i);
-  lastFlux = flux;
+  lastModelFlux = flux;
+  lastFlux = applyFluxScale(flux);
   lastWl   = wl;
 
-  renderPlot(wl, flux);
+  renderPlot(wl, lastFlux);
   document.getElementById('csv-btn').disabled = false;
 }
 
@@ -722,27 +742,29 @@ function renderPlot(wl, flux) {
     line: { color: '#4f8fff', width: 1.5 },
   }];
 
-  if (uploadedSpectrum) {
+  const dataColors = ['#ffb454', '#4fff9d', '#ff78c4', '#b18cff', '#ffd166', '#5eead4'];
+  uploadedSpectra.forEach((spectrum, index) => {
+    const color = dataColors[index % dataColors.length];
     const uploadedTrace = {
-      x: uploadedSpectrum.wavelength,
-      y: uploadedSpectrum.flux,
-      name: uploadedSpectrum.name || 'Uploaded data',
+      x: spectrum.wavelength,
+      y: spectrum.flux,
+      name: spectrum.name || 'Uploaded data ' + (index + 1),
       mode: 'lines+markers',
-      line: { color: '#ffb454', width: 1.2 },
-      marker: { color: '#ffb454', size: 4, opacity: 0.75 },
+      line: { color, width: 1.2 },
+      marker: { color, size: 4, opacity: 0.75 },
     };
-    if (uploadedSpectrum.error) {
+    if (spectrum.error) {
       uploadedTrace.error_y = {
         type: 'data',
-        array: uploadedSpectrum.error,
+        array: spectrum.error,
         visible: true,
-        color: 'rgba(255,180,84,0.55)',
+        color,
         thickness: 1,
         width: 2,
       };
     }
     traces.push(uploadedTrace);
-  }
+  });
 
   Plotly.react('plot', traces, {
     paper_bgcolor: 'transparent',
@@ -767,7 +789,7 @@ function renderPlot(wl, flux) {
       x: 0, y: 1.12,
       font: { color: '#8899cc', size: 10, family: 'Space Mono' },
     },
-    showlegend: Boolean(uploadedSpectrum),
+    showlegend: uploadedSpectra.length > 0,
     font: { family: 'Space Mono' },
   }, {
     responsive: true,
@@ -830,28 +852,43 @@ function parseUploadedSpectrum(text, filename) {
 }
 
 async function handleSpectrumUpload(event) {
-  const file = event.target.files && event.target.files[0];
-  if (!file) return;
+  const files = Array.from(event.target.files || []);
+  if (!files.length) return;
 
-  try {
-    const text = await file.text();
-    uploadedSpectrum = parseUploadedSpectrum(text, file.name);
-    document.getElementById('clear-spectrum-btn').style.display = 'inline-flex';
-    setUploadStatus('Loaded ' + uploadedSpectrum.name + ' (' + uploadedSpectrum.flux.length + ' points' + (uploadedSpectrum.error ? ', with flux errors' : '') + ').', 'loaded');
-    if (lastFlux && lastWl) renderPlot(lastWl, lastFlux);
-  } catch (e) {
-    uploadedSpectrum = null;
-    document.getElementById('clear-spectrum-btn').style.display = 'none';
-    setUploadStatus('Could not read spectrum: ' + e.message, 'error');
-  } finally {
-    event.target.value = '';
+  const loaded = [];
+  const errors = [];
+  for (const file of files) {
+    try {
+      const text = await file.text();
+      loaded.push(parseUploadedSpectrum(text, file.name));
+    } catch (e) {
+      errors.push(file.name + ': ' + e.message);
+    }
   }
+
+  uploadedSpectra = uploadedSpectra.concat(loaded);
+  document.getElementById('clear-spectrum-btn').style.display = uploadedSpectra.length ? 'inline-flex' : 'none';
+
+  if (loaded.length) {
+    const withErrors = uploadedSpectra.filter(spectrum => spectrum.error).length;
+    setUploadStatus(
+      'Loaded ' + uploadedSpectra.length + ' dataset' + (uploadedSpectra.length === 1 ? '' : 's') +
+      ' (' + withErrors + ' with flux errors).' +
+      (errors.length ? ' Skipped ' + errors.length + ': ' + errors.join('; ') : ''),
+      errors.length ? 'error' : 'loaded'
+    );
+    if (lastFlux && lastWl) renderPlot(lastWl, lastFlux);
+  } else {
+    setUploadStatus('Could not read spectrum: ' + errors.join('; '), 'error');
+  }
+
+  event.target.value = '';
 }
 
 function clearUploadedSpectrum() {
-  uploadedSpectrum = null;
+  uploadedSpectra = [];
   document.getElementById('clear-spectrum-btn').style.display = 'none';
-  setUploadStatus('Upload a CSV/TXT spectrum with columns: wavelength, flux, optional flux_error. Extra columns are ignored. A one-column flux file will use the model wavelength grid.');
+  setUploadStatus('Upload one or more CSV/TXT spectra with columns: wavelength, flux, optional flux_error. Extra columns are ignored. One-column flux files use the model wavelength grid.');
   if (lastFlux && lastWl) renderPlot(lastWl, lastFlux);
 }
 
@@ -862,6 +899,14 @@ function debouncedPredict() {
 
 Object.values(sliders).forEach(sl => {
   sl.addEventListener('input', () => { updateLabels(); debouncedPredict(); });
+});
+
+scaleSlider.addEventListener('input', () => {
+  updateLabels();
+  if (lastModelFlux && lastWl) {
+    lastFlux = applyFluxScale(lastModelFlux);
+    renderPlot(lastWl, lastFlux);
+  }
 });
 
 document.getElementById('spectrum-file').addEventListener('change', handleSpectrumUpload);

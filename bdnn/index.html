@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Brown Dwarf Spectrum Predictor</title>
-<meta name="bdnn-version" content="daanyal-a3e50a9-2026-05-19">
+<meta name="bdnn-version" content="daanyal-a3e50a9-upload-spectrum-2026-08-02">
 <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist/plotly.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;500;700&display=swap" rel="stylesheet">
@@ -359,7 +359,14 @@
     letter-spacing: 0.12em;
     text-transform: uppercase;
   }
-  .csv-btn {
+  .chart-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+  }
+
+  .csv-btn, .upload-btn {
     font-family: var(--mono);
     font-size: 0.62rem;
     color: var(--accent2);
@@ -370,11 +377,21 @@
     cursor: pointer;
     letter-spacing: 0.06em;
     transition: background 0.15s;
-    /* tap-friendly */
     min-height: 30px;
   }
-  .csv-btn:hover:not(:disabled) { background: rgba(79,143,255,0.25); }
+  .csv-btn:hover:not(:disabled), .upload-btn:hover { background: rgba(79,143,255,0.25); }
   .csv-btn:disabled { opacity: 0.35; cursor: default; }
+  .upload-btn.clear { color: #ffb0b0; border-color: rgba(255,80,80,0.25); background: rgba(255,80,80,0.08); }
+  .file-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+  .upload-status {
+    width: 100%;
+    font-family: var(--mono);
+    font-size: 0.58rem;
+    color: var(--text3);
+    line-height: 1.45;
+  }
+  .upload-status.loaded { color: var(--accent2); }
+  .upload-status.error { color: #ff8080; }
 
   #plot {
     width: 100%;
@@ -560,7 +577,13 @@
     <div class="chart-card">
       <div class="chart-header">
         <span class="chart-title">Predicted Spectrum</span>
-        <button class="csv-btn" id="csv-btn" onclick="downloadCSV()" disabled>Download CSV</button>
+        <div class="chart-actions">
+          <label class="upload-btn" for="spectrum-file">Upload Data</label>
+          <input class="file-input" type="file" id="spectrum-file" accept=".csv,.txt,.dat,.tsv,text/csv,text/plain">
+          <button class="upload-btn clear" id="clear-spectrum-btn" onclick="clearUploadedSpectrum()" style="display:none">Clear Data</button>
+          <button class="csv-btn" id="csv-btn" onclick="downloadCSV()" disabled>Download CSV</button>
+        </div>
+        <div class="upload-status" id="upload-status">Upload a CSV/TXT spectrum with columns: wavelength, flux, optional flux_error. Extra columns are ignored. A one-column flux file will use the model wavelength grid.</div>
       </div>
       <div id="plot"></div>
       <div class="loading-overlay" id="loading-overlay">
@@ -602,7 +625,7 @@ const FILES = {
 };
 
 let session = null, xScaler = null, yScaler = null, pcaData = null, wavelengths = null;
-let lastFlux = null, lastWl = null;
+let lastFlux = null, lastWl = null, uploadedSpectrum = null;
 let debounceTimer = null;
 
 const sliders = {
@@ -687,11 +710,41 @@ async function predict() {
   lastFlux = flux;
   lastWl   = wl;
 
-  Plotly.react('plot', [{
+  renderPlot(wl, flux);
+  document.getElementById('csv-btn').disabled = false;
+}
+
+function renderPlot(wl, flux) {
+  const traces = [{
     x: wl, y: flux,
+    name: 'Model',
     mode: 'lines',
     line: { color: '#4f8fff', width: 1.5 },
-  }], {
+  }];
+
+  if (uploadedSpectrum) {
+    const uploadedTrace = {
+      x: uploadedSpectrum.wavelength,
+      y: uploadedSpectrum.flux,
+      name: uploadedSpectrum.name || 'Uploaded data',
+      mode: 'lines+markers',
+      line: { color: '#ffb454', width: 1.2 },
+      marker: { color: '#ffb454', size: 4, opacity: 0.75 },
+    };
+    if (uploadedSpectrum.error) {
+      uploadedTrace.error_y = {
+        type: 'data',
+        array: uploadedSpectrum.error,
+        visible: true,
+        color: 'rgba(255,180,84,0.55)',
+        thickness: 1,
+        width: 2,
+      };
+    }
+    traces.push(uploadedTrace);
+  }
+
+  Plotly.react('plot', traces, {
     paper_bgcolor: 'transparent',
     plot_bgcolor:  'transparent',
     margin: { t: 10, r: 10, b: 50, l: 55 },
@@ -709,7 +762,12 @@ async function predict() {
       tickfont: { color: '#4a5a88', size: 9, family: 'Space Mono' },
       zerolinecolor: 'rgba(100,140,255,0.08)',
     },
-    showlegend: false,
+    legend: {
+      orientation: 'h',
+      x: 0, y: 1.12,
+      font: { color: '#8899cc', size: 10, family: 'Space Mono' },
+    },
+    showlegend: Boolean(uploadedSpectrum),
     font: { family: 'Space Mono' },
   }, {
     responsive: true,
@@ -717,8 +775,6 @@ async function predict() {
     modeBarButtonsToRemove: ['sendDataToCloud','editInChartStudio','select2d','lasso2d','toggleSpikelines','toImage'],
     displaylogo: false,
   });
-
-  document.getElementById('csv-btn').disabled = false;
 }
 
 function downloadCSV() {
@@ -731,6 +787,74 @@ function downloadCSV() {
   a.click();
 }
 
+function setUploadStatus(message, kind = '') {
+  const el = document.getElementById('upload-status');
+  el.textContent = message;
+  el.className = 'upload-status' + (kind ? ' ' + kind : '');
+}
+
+function parseNumberList(line) {
+  return line
+    .trim()
+    .split(/[\s,;]+/)
+    .map(Number)
+    .filter(Number.isFinite);
+}
+
+function parseUploadedSpectrum(text, filename) {
+  const rows = text
+    .split(/\r?\n/)
+    .map(line => line.replace(/#.*/, '').trim())
+    .filter(Boolean)
+    .map(parseNumberList)
+    .filter(row => row.length > 0);
+
+  if (rows.length < 2) throw new Error('Need at least two numeric rows.');
+
+  const multiColumnRows = rows.filter(row => row.length >= 2);
+  if (multiColumnRows.length >= Math.max(2, rows.length * 0.8)) {
+    const error = multiColumnRows.map(row => row[2]).filter(Number.isFinite);
+    return {
+      name: filename || 'Uploaded data',
+      wavelength: multiColumnRows.map(row => row[0]),
+      flux: multiColumnRows.map(row => row[1]),
+      error: error.length === multiColumnRows.length ? error : null,
+    };
+  }
+
+  const flux = rows.map(row => row[0]);
+  if (!wavelengths || wavelengths.length !== flux.length) {
+    throw new Error('One-column files must have the same number of rows as the model wavelength grid.');
+  }
+  return { name: filename || 'Uploaded data', wavelength: wavelengths.slice(), flux };
+}
+
+async function handleSpectrumUpload(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  try {
+    const text = await file.text();
+    uploadedSpectrum = parseUploadedSpectrum(text, file.name);
+    document.getElementById('clear-spectrum-btn').style.display = 'inline-flex';
+    setUploadStatus('Loaded ' + uploadedSpectrum.name + ' (' + uploadedSpectrum.flux.length + ' points' + (uploadedSpectrum.error ? ', with flux errors' : '') + ').', 'loaded');
+    if (lastFlux && lastWl) renderPlot(lastWl, lastFlux);
+  } catch (e) {
+    uploadedSpectrum = null;
+    document.getElementById('clear-spectrum-btn').style.display = 'none';
+    setUploadStatus('Could not read spectrum: ' + e.message, 'error');
+  } finally {
+    event.target.value = '';
+  }
+}
+
+function clearUploadedSpectrum() {
+  uploadedSpectrum = null;
+  document.getElementById('clear-spectrum-btn').style.display = 'none';
+  setUploadStatus('Upload a CSV/TXT spectrum with columns: wavelength, flux, optional flux_error. Extra columns are ignored. A one-column flux file will use the model wavelength grid.');
+  if (lastFlux && lastWl) renderPlot(lastWl, lastFlux);
+}
+
 function debouncedPredict() {
   clearTimeout(debounceTimer);
   debounceTimer = setTimeout(() => predict(), 80);
@@ -739,6 +863,8 @@ function debouncedPredict() {
 Object.values(sliders).forEach(sl => {
   sl.addEventListener('input', () => { updateLabels(); debouncedPredict(); });
 });
+
+document.getElementById('spectrum-file').addEventListener('change', handleSpectrumUpload);
 
 async function init() {
   try {

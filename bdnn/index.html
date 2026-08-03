@@ -563,7 +563,7 @@
           <div class="slider-wrap">
             <input type="range" id="sl-distance" min="1" max="100" step="0.1" value="10">
           </div>
-          <div class="param-unit">model flux scaled by (R / d)²</div>
+          <div class="param-unit">model flux scaled by (Rjup converted to pc / d)²</div>
         </div>
 
       </div><!-- /inner -->
@@ -712,10 +712,12 @@ function updateLabels() {
   updateSliderTrack(distanceSlider);
 }
 
+const R_JUP_TO_PC = 2.317e-9;
+
 function getFluxScale() {
-  const radius = parseFloat(radiusSlider.value);
-  const distance = parseFloat(distanceSlider.value);
-  return Math.pow(radius / distance, 2);
+  const radiusRjup = parseFloat(radiusSlider.value);
+  const distancePc = parseFloat(distanceSlider.value);
+  return Math.pow((radiusRjup * R_JUP_TO_PC) / distancePc, 2);
 }
 function applyFluxScale(flux) { return flux.map(v => v * getFluxScale()); }
 

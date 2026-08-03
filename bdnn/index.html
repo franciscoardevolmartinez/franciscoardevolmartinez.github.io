@@ -544,15 +544,26 @@
           <div class="param-unit">3.0 – 6.0</div>
         </div>
 
-        <div class="param-row" style="margin-bottom:0">
+        <div class="param-row">
           <div class="param-header">
-            <span class="param-name">R²/d² Scale</span>
-            <span class="param-value" id="val-scale">1.00</span>
+            <span class="param-name">Radius</span>
+            <span class="param-value" id="val-radius">1.00 Rjup</span>
           </div>
           <div class="slider-wrap">
-            <input type="range" id="sl-scale" min="-6" max="6" step="0.05" value="0">
+            <input type="range" id="sl-radius" min="0.5" max="2.0" step="0.01" value="1.0">
           </div>
-          <div class="param-unit">multiplies model flux by 10^x</div>
+          <div class="param-unit">0.5 – 2.0 Rjup</div>
+        </div>
+
+        <div class="param-row" style="margin-bottom:0">
+          <div class="param-header">
+            <span class="param-name">Distance</span>
+            <span class="param-value" id="val-distance">10.0 pc</span>
+          </div>
+          <div class="slider-wrap">
+            <input type="range" id="sl-distance" min="1" max="100" step="0.1" value="10">
+          </div>
+          <div class="param-unit">model flux scaled by (R / d)²</div>
         </div>
 
       </div><!-- /inner -->
@@ -649,7 +660,8 @@ const sliders = {
   grav:  document.getElementById('sl-grav'),
 };
 
-const scaleSlider = document.getElementById('sl-scale');
+const radiusSlider = document.getElementById('sl-radius');
+const distanceSlider = document.getElementById('sl-distance');
 
 function updateSliderTrack(el) {
   const pct = ((parseFloat(el.value) - parseFloat(el.min)) /
@@ -676,7 +688,8 @@ function updateLabels() {
   const metal = parseFloat(sliders.metal.value);
   const kzz   = parseFloat(sliders.kzz.value);
   const grav  = parseFloat(sliders.grav.value);
-  const scale = getFluxScale();
+  const radius = parseFloat(radiusSlider.value);
+  const distance = parseFloat(distanceSlider.value);
 
   document.getElementById('val-temp').textContent  = T + ' K';
   document.getElementById('val-co').textContent    = co.toFixed(2);
@@ -685,7 +698,8 @@ function updateLabels() {
   document.getElementById('val-metal').textContent = metal.toFixed(1);
   document.getElementById('val-kzz').textContent   = kzz.toFixed(1);
   document.getElementById('val-grav').textContent  = grav.toFixed(2);
-  document.getElementById('val-scale').textContent = scale.toExponential(2);
+  document.getElementById('val-radius').textContent = radius.toFixed(2) + ' Rjup';
+  document.getElementById('val-distance').textContent = distance.toFixed(1) + ' pc';
 
   document.getElementById('s-temp').textContent     = T + ' K';
   document.getElementById('s-temp-log').textContent = Math.log10(T).toFixed(2);
@@ -694,10 +708,15 @@ function updateLabels() {
   document.getElementById('s-grav').textContent     = grav.toFixed(2);
 
   Object.values(sliders).forEach(updateSliderTrack);
-  updateSliderTrack(scaleSlider);
+  updateSliderTrack(radiusSlider);
+  updateSliderTrack(distanceSlider);
 }
 
-function getFluxScale() { return Math.pow(10, parseFloat(scaleSlider.value)); }
+function getFluxScale() {
+  const radius = parseFloat(radiusSlider.value);
+  const distance = parseFloat(distanceSlider.value);
+  return Math.pow(radius / distance, 2);
+}
 function applyFluxScale(flux) { return flux.map(v => v * getFluxScale()); }
 
 function stdScale(v, mean, std)   { return (v - mean) / std; }
@@ -735,14 +754,9 @@ async function predict() {
 }
 
 function renderPlot(wl, flux) {
-  const traces = [{
-    x: wl, y: flux,
-    name: 'Model',
-    mode: 'lines',
-    line: { color: '#4f8fff', width: 1.5 },
-  }];
-
+  const traces = [];
   const dataColors = ['#ffb454', '#4fff9d', '#ff78c4', '#b18cff', '#ffd166', '#5eead4'];
+
   uploadedSpectra.forEach((spectrum, index) => {
     const color = dataColors[index % dataColors.length];
     const uploadedTrace = {
@@ -751,7 +765,7 @@ function renderPlot(wl, flux) {
       name: spectrum.name || 'Uploaded data ' + (index + 1),
       mode: 'lines+markers',
       line: { color, width: 1.2 },
-      marker: { color, size: 4, opacity: 0.75 },
+      marker: { color, size: 4, opacity: 0.65 },
     };
     if (spectrum.error) {
       uploadedTrace.error_y = {
@@ -764,6 +778,13 @@ function renderPlot(wl, flux) {
       };
     }
     traces.push(uploadedTrace);
+  });
+
+  traces.push({
+    x: wl, y: flux,
+    name: 'Model',
+    mode: 'lines',
+    line: { color: '#4f8fff', width: 2.2 },
   });
 
   Plotly.react('plot', traces, {
@@ -901,12 +922,14 @@ Object.values(sliders).forEach(sl => {
   sl.addEventListener('input', () => { updateLabels(); debouncedPredict(); });
 });
 
-scaleSlider.addEventListener('input', () => {
-  updateLabels();
-  if (lastModelFlux && lastWl) {
-    lastFlux = applyFluxScale(lastModelFlux);
-    renderPlot(lastWl, lastFlux);
-  }
+[radiusSlider, distanceSlider].forEach(slider => {
+  slider.addEventListener('input', () => {
+    updateLabels();
+    if (lastModelFlux && lastWl) {
+      lastFlux = applyFluxScale(lastModelFlux);
+      renderPlot(lastWl, lastFlux);
+    }
+  });
 });
 
 document.getElementById('spectrum-file').addEventListener('change', handleSpectrumUpload);

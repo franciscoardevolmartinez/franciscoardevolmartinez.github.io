@@ -755,9 +755,33 @@ async function predict() {
   document.getElementById('csv-btn').disabled = false;
 }
 
+function getUploadedYRange() {
+  if (!uploadedSpectra.length) return null;
+
+  const values = [];
+  uploadedSpectra.forEach(spectrum => {
+    spectrum.flux.forEach((y, index) => {
+      if (!Number.isFinite(y)) return;
+      const err = spectrum.error && Number.isFinite(spectrum.error[index]) ? Math.abs(spectrum.error[index]) : 0;
+      values.push(y - err, y + err);
+    });
+  });
+
+  if (!values.length) return null;
+  let minY = Math.min(...values);
+  let maxY = Math.max(...values);
+  if (minY === maxY) {
+    const pad = Math.abs(minY) > 0 ? Math.abs(minY) * 0.1 : 1;
+    return [minY - pad, maxY + pad];
+  }
+  const pad = (maxY - minY) * 0.08;
+  return [minY - pad, maxY + pad];
+}
+
 function renderPlot(wl, flux) {
   const traces = [];
   const dataColors = ['#ffb454', '#4fff9d', '#ff78c4', '#b18cff', '#ffd166', '#5eead4'];
+  const fixedYRange = getUploadedYRange();
 
   uploadedSpectra.forEach((spectrum, index) => {
     const color = dataColors[index % dataColors.length];
@@ -806,6 +830,8 @@ function renderPlot(wl, flux) {
       linecolor: 'rgba(100,140,255,0.15)',
       tickfont: { color: '#4a5a88', size: 9, family: 'Space Mono' },
       zerolinecolor: 'rgba(100,140,255,0.08)',
+      autorange: fixedYRange ? false : true,
+      range: fixedYRange || undefined,
     },
     legend: {
       orientation: 'h',
